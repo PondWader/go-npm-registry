@@ -9,9 +9,11 @@ import (
 )
 
 type Config struct {
-	UserKeys []string `default:"[]"`
-	DbPath   string   `default:"./sqlite.db"`
-	Port     int      `default:"8080"`
+	UserKeys          []string          `yaml:"user-keys" default:"[]"`
+	DbPath            string            `yaml:"db-path" default:"./sqlite.db"`
+	Port              int               `default:"8080"`
+	StorageDriver     string            `yaml:"storage-driver" default:"fs"`
+	StorageDriverOpts map[string]string `yaml:"storage-driver-opts" default:"{\"base-dir\": \"/var/lib/go-npm-registry\"}"`
 }
 
 func Load(path string) (Config, error) {

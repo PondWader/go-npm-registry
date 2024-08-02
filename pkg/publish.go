@@ -6,9 +6,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 
 	"github.com/PondWader/go-npm-registry/pkg/response"
 )
+
+// Regex for validating package names taken from https://github.com/dword-design/package-name-regex/blob/master/src/index.js
+var PackageNameRegex, _ = regexp.Compile(`^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$`)
 
 type PublishPackageBody struct {
 	Name     string            `json:"name"`
@@ -49,6 +53,12 @@ func PublishPackage(ctx RequestContext, w http.ResponseWriter, r *http.Request) 
 	var body PublishPackageBody
 	decoder.Decode(&body)
 
+	// Validate name
+	if !PackageNameRegex.MatchString(body.Name) {
+		response.Error(w, http.StatusBadRequest, "Invalid package name")
+		return
+	}
+
 	for tag, version := range body.DistTags {
 		versionData, ok := body.Versions[version]
 		if !ok {
@@ -82,7 +92,17 @@ func PublishPackage(ctx RequestContext, w http.ResponseWriter, r *http.Request) 
 			response.Error(w, http.StatusBadRequest, "Data length does not match attachment length value")
 			return
 		}
-		fmt.Println(tag, data)
+
+		// TODO: Check .tgz file is valid?
+
+		fileName := body.Name + "-" + url.QueryEscape(version) + ".tgz"
+		if err := ctx.Storage.Write(fileName, data); err != nil {
+			response.Error(w, http.StatusInternalServerError, "An internal error occured saving file")
+			fmt.Println("Failed to save", fileName+":", err)
+			return
+		}
+
+		fmt.Println("Saved", tag)
 	}
 
 	response.Error(w, http.StatusBadRequest, "Version already exists")
