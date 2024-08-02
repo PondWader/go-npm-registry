@@ -11,6 +11,7 @@ import (
 type Config struct {
 	UserKeys []string `default:"[]"`
 	DbPath   string   `default:"./sqlite.db"`
+	Port     int      `default:"8080"`
 }
 
 func Load(path string) (Config, error) {

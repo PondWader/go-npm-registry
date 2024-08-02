@@ -17,5 +17,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	pkg.StartServer(*configPath)
+	if err := pkg.StartServer(*configPath); err != nil {
+		fmt.Println("An error occured starting the registry server:", err)
+	}
 }

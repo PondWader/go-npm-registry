@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type PackageModel struct {
+type Package struct {
 	ID        uint   `gorm:"primaryKey"`
 	Name      string `gorm:"index"`
 	Latest    string
@@ -18,8 +18,10 @@ type PackageModel struct {
 	UpdatedAt time.Time
 }
 
-type PackageVersionModel struct {
+type PackageVersion struct {
 	Id           uuid.UUID `gorm:"primaryKey"`
+	PackageId    uint
+	Package      Package `gorm:"foreignKey:PackageId"`
 	Version      string
 	Author       string
 	Description  sql.NullString
@@ -33,7 +35,7 @@ type PackageVersionModel struct {
 	CreatedAt time.Time
 }
 
-type AuditLogModel struct {
+type AuditLog struct {
 	Id      uint `gorm:"primaryKey"`
 	UserKey string
 }
@@ -44,7 +46,7 @@ func Open(filePath string) (*gorm.DB, error) {
 		return nil, err
 	}
 
-	if err = db.AutoMigrate(&PackageModel{}, &PackageVersionModel{}, &AuditLogModel{}); err != nil {
+	if err = db.AutoMigrate(&Package{}, &PackageVersion{}, &AuditLog{}); err != nil {
 		return db, err
 	}
 
