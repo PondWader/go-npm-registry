@@ -3,12 +3,17 @@ package pkg
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"regexp"
 
+	"github.com/PondWader/go-npm-registry/pkg/database"
 	"github.com/PondWader/go-npm-registry/pkg/response"
+	"github.com/google/uuid"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 // Regex for validating package names taken from https://github.com/dword-design/package-name-regex/blob/master/src/index.js
@@ -65,6 +70,14 @@ func PublishPackage(ctx RequestContext, w http.ResponseWriter, r *http.Request) 
 			continue
 		}
 
+		// Check that there is not already a package published with the same version
+		queryResult := database.PackageVersion{}
+		ctx.DB.Select("ID").Where("version = ?", version).First(&queryResult)
+		if queryResult.Version != version {
+			response.Error(w, http.StatusBadGateway, "Version already exists")
+			return
+		}
+
 		distUrl, err := url.Parse(versionData.Dist.Tarball)
 		if err != nil {
 			response.Error(w, http.StatusBadRequest, "Invalid tarball URL")
@@ -102,8 +115,59 @@ func PublishPackage(ctx RequestContext, w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		fmt.Println("Saved", tag)
+		err = ctx.DB.Transaction(func(tx *gorm.DB) error {
+			// Make sure package exists in DB
+			var packageRecord database.Package
+			res := tx.Where("name = ?", body.Name).Find(&packageRecord)
+			if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+				res = tx.Create(&database.Package{
+					Name: body.Name,
+					DistTags: datatypes.JSONMap{
+						tag: version,
+					},
+				})
+				if res.Error != nil {
+					response.Error(w, http.StatusInternalServerError, "An internal error occured")
+					fmt.Println("Failed to create package record:", res.Error)
+					return err
+				}
+			} else if res.Error != nil {
+				response.Error(w, http.StatusInternalServerError, "An internal error occured")
+				fmt.Println("Failed to query package record:", res.Error)
+				return err
+			} else {
+				// Add dist tag
+				res = tx.Model(&database.Package{}).Where("id = ?", packageRecord.Name).UpdateColumn("dist_tags", datatypes.JSONSet("dist_tags").Set(tag, version))
+				if res.Error != nil {
+					response.Error(w, http.StatusInternalServerError, "An internal error occured")
+					fmt.Println("Failed to update package dist tags:", res.Error)
+					return err
+				}
+			}
+
+			uuid, err := uuid.NewRandom()
+			if err != nil {
+				response.Error(w, http.StatusInternalServerError, "An internal error occured")
+				fmt.Println("Failed to generate UUID:", err)
+				return err
+			}
+
+			res = tx.Create(&database.PackageVersion{
+				ID:        uuid,
+				PackageID: 5,
+			})
+			if res.Error != nil {
+				response.Error(w, http.StatusInternalServerError, "An internal error occured")
+				fmt.Println("Failed to generate UUID:", res.Error)
+				return err
+			}
+
+			return nil
+		})
+		if err != nil {
+			return
+		}
 	}
 
-	response.Error(w, http.StatusBadRequest, "Version already exists")
+	w.WriteHeader(200)
 }

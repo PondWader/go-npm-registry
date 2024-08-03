@@ -12,20 +12,20 @@ import (
 
 type Package struct {
 	ID        uint   `gorm:"primaryKey"`
-	Name      string `gorm:"index"`
-	Latest    string
+	Name      string `gorm:"index,unique"`
+	DistTags  datatypes.JSONMap
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
 
 type PackageVersion struct {
-	Id           uuid.UUID `gorm:"primaryKey"`
-	PackageId    uint
-	Package      Package `gorm:"foreignKey:PackageId"`
-	Version      string
-	Author       string
+	ID           uuid.UUID `gorm:"primaryKey"`
+	PackageID    uint      `gorm:"index:idversion,unique"`
+	Package      Package   `gorm:"foreignKey:PackageId"`
+	Version      string    `gorm:"index:idversion,unique"`
+	Author       sql.NullString
 	Description  sql.NullString
-	Dependencies datatypes.JSON
+	Dependencies datatypes.JSONMap
 
 	DistIntegrity    string
 	DistShasum       string
@@ -36,7 +36,7 @@ type PackageVersion struct {
 }
 
 type AuditLog struct {
-	Id      uint `gorm:"primaryKey"`
+	ID      uint `gorm:"primaryKey"`
 	UserKey string
 }
 
