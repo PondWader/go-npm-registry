@@ -1,7 +1,6 @@
 package database
 
 import (
-	"database/sql"
 	"time"
 
 	"github.com/glebarez/sqlite"
@@ -21,11 +20,13 @@ type Package struct {
 type PackageVersion struct {
 	ID           uuid.UUID `gorm:"primaryKey"`
 	PackageID    uint      `gorm:"index:idversion,unique"`
-	Package      Package   `gorm:"foreignKey:PackageId"`
+	Package      Package   `gorm:"foreignKey:PackageID"`
 	Version      string    `gorm:"index:idversion,unique"`
-	Author       sql.NullString
-	Description  sql.NullString
+	Author       *string
+	Description  *string
 	Dependencies datatypes.JSONMap
+	Engines      datatypes.JSONMap
+	Bin          datatypes.JSONMap
 
 	DistIntegrity    string
 	DistShasum       string

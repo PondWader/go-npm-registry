@@ -1,10 +1,14 @@
 package pkg
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -31,15 +35,15 @@ type PublishPackageBody struct {
 		Author      struct {
 			Name string `json:"name"`
 		} `json:"author"`
-		Homepage             string            `json:"homepage"`
-		Bugs                 string            `json:"bugs"`
-		License              string            `json:"license"`
-		Bin                  map[string]string `json:"bin"`
-		Dependencies         map[string]string `json:"dependencies"`
-		PeerDependencies     map[string]string `json:"peerDependencies"`
-		OptionalDependencies map[string]string `json:"optionalDependencies"`
-		Engines              map[string]string `json:"engines"`
-		Types                string            `json:"types"`
+		Homepage             string         `json:"homepage"`
+		Bugs                 string         `json:"bugs"`
+		License              string         `json:"license"`
+		Bin                  map[string]any `json:"bin"`
+		Dependencies         map[string]any `json:"dependencies"`
+		PeerDependencies     map[string]any `json:"peerDependencies"`
+		OptionalDependencies map[string]any `json:"optionalDependencies"`
+		Engines              map[string]any `json:"engines"`
+		Types                string         `json:"types"`
 		Dist                 struct {
 			Integrity string `json:"integrity"`
 			Shasum    string `json:"shasum"`
@@ -73,8 +77,8 @@ func PublishPackage(ctx RequestContext, w http.ResponseWriter, r *http.Request) 
 		// Check that there is not already a package published with the same version
 		queryResult := database.PackageVersion{}
 		ctx.DB.Select("ID").Where("version = ?", version).First(&queryResult)
-		if queryResult.Version != version {
-			response.Error(w, http.StatusBadGateway, "Version already exists")
+		if queryResult.Version == version {
+			response.Error(w, http.StatusBadRequest, "Version already exists")
 			return
 		}
 
@@ -106,7 +110,11 @@ func PublishPackage(ctx RequestContext, w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		// TODO: Check .tgz file is valid?
+		fileCount, totalSize, err := getTarStats(data)
+		if err != nil {
+			response.Error(w, http.StatusBadRequest, "Invalid gzipped tarball")
+			return
+		}
 
 		fileName := body.Name + "-" + url.QueryEscape(version) + ".tgz"
 		if err := ctx.Storage.Write(fileName, data); err != nil {
@@ -152,14 +160,34 @@ func PublishPackage(ctx RequestContext, w http.ResponseWriter, r *http.Request) 
 				return err
 			}
 
+			var author *string
+			if versionData.Author.Name != "" {
+				author = &versionData.Author.Name
+			}
+			var description *string
+			if versionData.Description != "" {
+				description = &versionData.Description
+			}
+
 			res = tx.Create(&database.PackageVersion{
-				ID:        uuid,
-				PackageID: 5,
+				ID:           uuid,
+				PackageID:    packageRecord.ID,
+				Version:      version,
+				Author:       author,
+				Description:  description,
+				Dependencies: versionData.Dependencies,
+				Engines:      versionData.Engines,
+				Bin:          versionData.Bin,
+
+				DistIntegrity:    versionData.Dist.Integrity,
+				DistShasum:       versionData.Dist.Shasum,
+				DistUnpackedSize: uint(totalSize),
+				DistFileCount:    uint(fileCount),
 			})
 			if res.Error != nil {
 				response.Error(w, http.StatusInternalServerError, "An internal error occured")
-				fmt.Println("Failed to generate UUID:", res.Error)
-				return err
+				fmt.Println("Failed to create record:", res.Error)
+				return res.Error
 			}
 
 			return nil
@@ -169,5 +197,25 @@ func PublishPackage(ctx RequestContext, w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	w.WriteHeader(200)
+}
+
+func getTarStats(data []byte) (totalSize int64, fileCount int64, err error) {
+	gzipReader, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return 0, 0, err
+	}
+	reader := tar.NewReader(gzipReader)
+
+	for {
+		header, err := reader.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		} else if err != nil {
+			return 0, 0, err
+		}
+
+		totalSize += header.Size
+		fileCount++
+	}
+	return
 }
