@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type Package struct {
@@ -18,15 +19,17 @@ type Package struct {
 }
 
 type PackageVersion struct {
-	ID           uuid.UUID `gorm:"primaryKey"`
-	PackageID    uint      `gorm:"index:idversion,unique"`
-	Package      Package   `gorm:"foreignKey:PackageID"`
-	Version      string    `gorm:"index:idversion,unique"`
-	Author       *string
-	Description  *string
-	Dependencies datatypes.JSONMap
-	Engines      datatypes.JSONMap
-	Bin          datatypes.JSONMap
+	ID                   uuid.UUID `gorm:"primaryKey"`
+	PackageID            uint      `gorm:"index:idversion,unique"`
+	Package              Package   `gorm:"foreignKey:PackageID"`
+	Version              string    `gorm:"index:idversion,unique"`
+	Author               *string
+	Description          *string
+	Dependencies         datatypes.JSONMap
+	PeerDependencies     datatypes.JSONMap
+	OptionalDependencies datatypes.JSONMap
+	Engines              datatypes.JSONMap
+	Bin                  datatypes.JSONMap
 
 	DistIntegrity    string
 	DistShasum       string
@@ -42,7 +45,9 @@ type AuditLog struct {
 }
 
 func Open(filePath string) (*gorm.DB, error) {
-	db, err := gorm.Open(sqlite.Open("sqlite.db?_pragma=journal_mode(WAL)"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open("sqlite.db?_pragma=journal_mode(WAL)"), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
 	if err != nil {
 		return nil, err
 	}

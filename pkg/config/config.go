@@ -12,6 +12,7 @@ type Config struct {
 	UserKeys          []string          `yaml:"user-keys" default:"[]"`
 	DbPath            string            `yaml:"db-path" default:"./sqlite.db"`
 	Port              int               `default:"8080"`
+	Url               string            `default:"http://localhost:8080"`
 	StorageDriver     string            `yaml:"storage-driver" default:"fs"`
 	StorageDriverOpts map[string]string `yaml:"storage-driver-opts" default:"{\"base-dir\": \"/var/lib/go-npm-registry\"}"`
 }

@@ -42,7 +42,7 @@ func StartServer(configPath string) error {
 		Config:  cfg,
 	}
 
-	http.HandleFunc("GET /{package}", ContextMiddleware(baseReqCtx, GetPackage))
+	http.HandleFunc("GET /{package...}", ContextMiddleware(baseReqCtx, GetPackage))
 	http.HandleFunc("PUT /{package}", AuthMiddleware(baseReqCtx, PublishPackage))
 
 	fmt.Println("Starting HTTP server on port", cfg.Port)

@@ -76,7 +76,7 @@ func PublishPackage(ctx RequestContext, w http.ResponseWriter, r *http.Request) 
 
 		// Check that there is not already a package published with the same version
 		queryResult := database.PackageVersion{}
-		ctx.DB.Select("ID").Where("version = ?", version).First(&queryResult)
+		ctx.DB.Select("version").Where("version = ?", version).First(&queryResult)
 		if queryResult.Version == version {
 			response.Error(w, http.StatusBadRequest, "Version already exists")
 			return
@@ -126,7 +126,7 @@ func PublishPackage(ctx RequestContext, w http.ResponseWriter, r *http.Request) 
 		err = ctx.DB.Transaction(func(tx *gorm.DB) error {
 			// Make sure package exists in DB
 			var packageRecord database.Package
-			res := tx.Where("name = ?", body.Name).Find(&packageRecord)
+			res := tx.Where("name = ?", body.Name).First(&packageRecord)
 			if errors.Is(res.Error, gorm.ErrRecordNotFound) {
 				res = tx.Create(&database.Package{
 					Name: body.Name,
@@ -170,14 +170,16 @@ func PublishPackage(ctx RequestContext, w http.ResponseWriter, r *http.Request) 
 			}
 
 			res = tx.Create(&database.PackageVersion{
-				ID:           uuid,
-				PackageID:    packageRecord.ID,
-				Version:      version,
-				Author:       author,
-				Description:  description,
-				Dependencies: versionData.Dependencies,
-				Engines:      versionData.Engines,
-				Bin:          versionData.Bin,
+				ID:                   uuid,
+				PackageID:            packageRecord.ID,
+				Version:              version,
+				Author:               author,
+				Description:          description,
+				Dependencies:         versionData.Dependencies,
+				PeerDependencies:     versionData.PeerDependencies,
+				OptionalDependencies: versionData.OptionalDependencies,
+				Engines:              versionData.Engines,
+				Bin:                  versionData.Bin,
 
 				DistIntegrity:    versionData.Dist.Integrity,
 				DistShasum:       versionData.Dist.Shasum,
@@ -196,7 +198,6 @@ func PublishPackage(ctx RequestContext, w http.ResponseWriter, r *http.Request) 
 			return
 		}
 	}
-
 }
 
 func getTarStats(data []byte) (totalSize int64, fileCount int64, err error) {
