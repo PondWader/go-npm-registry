@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -13,7 +14,11 @@ type fsStorageDriver struct {
 }
 
 func NewFsDriver(baseDir string) (StorageDriver, error) {
-	baseDir = filepath.Clean(baseDir)
+	absDir, err := filepath.Abs(baseDir)
+	if err != nil {
+		return nil, err
+	}
+	baseDir = filepath.Clean(absDir)
 	if err := os.MkdirAll(baseDir, 0o700); err != nil {
 		return nil, err
 	}
@@ -24,7 +29,13 @@ func NewFsDriver(baseDir string) (StorageDriver, error) {
 func (fs fsStorageDriver) ResolvePath(path string) (string, error) {
 	resolved := filepath.Join(fs.BaseDir, path)
 	// Check that the path is in the base dir for security
-	if strings.HasPrefix(resolved, "..") || !strings.HasPrefix(resolved, fs.BaseDir+"/") {
+	var isInBaseDir bool
+	if runtime.GOOS == "windows" {
+		isInBaseDir = strings.HasPrefix(resolved, fs.BaseDir+"\\")
+	} else {
+		isInBaseDir = strings.HasPrefix(resolved, fs.BaseDir+"/")
+	}
+	if strings.Contains(resolved, "..") || !isInBaseDir {
 		return "", errors.New("path is invalid")
 	}
 	return resolved, nil

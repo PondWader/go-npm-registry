@@ -87,7 +87,7 @@ func PublishPackage(ctx RequestContext, w http.ResponseWriter, r *http.Request) 
 			response.Error(w, http.StatusBadRequest, "Invalid tarball URL")
 			return
 		}
-		// Assume that path begins with /<package name>/-/@passiveapp
+		// Assume that path begins with /<package name>/-/@scope
 		attachmentName := distUrl.Path[len(body.Name)+4:]
 		attachment, ok := body.Attachments[attachmentName]
 		if !ok {
@@ -145,7 +145,7 @@ func PublishPackage(ctx RequestContext, w http.ResponseWriter, r *http.Request) 
 				return err
 			} else {
 				// Add dist tag
-				res = tx.Model(&database.Package{}).Where("id = ?", packageRecord.Name).UpdateColumn("dist_tags", datatypes.JSONSet("dist_tags").Set(tag, version))
+				res = tx.Model(&database.Package{}).Where("id = ?", packageRecord.ID).UpdateColumn("dist_tags", datatypes.JSONSet("dist_tags").Set(tag, version))
 				if res.Error != nil {
 					response.Error(w, http.StatusInternalServerError, "An internal error occured")
 					fmt.Println("Failed to update package dist tags:", res.Error)
